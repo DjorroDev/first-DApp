@@ -11,6 +11,11 @@ function App() {
   const [allQuestsInfo, setAllQuestsInfo] = useState(null);
   const [userQuestStatuses, setUserQuestStatuses] = useState(null);
   const [questId, setQuestId] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  const [questTitle, setQuestTitle] = useState("");
+  const [questReward, setQuestReward] = useState(0);
+  const [numberOfRewards, setNumberOfRewards] = useState(0);
 
   const connectWalletHandler = async () => {
     if (typeof window !== "undefined" && typeof window.ethereum !== "undefined") {
@@ -34,8 +39,10 @@ function App() {
       const stackupContract = new ethers.Contract(contractAddr, abi, provider);
 
       const adminAddr = await stackupContract.admin();
-      console.log("adminAddr:", adminAddr);
+      // console.log("adminAddr:", adminAddr);
       setAdminAddr(adminAddr);
+      setIsAdmin(adminAddr.toLowerCase() === currentAccount);
+      // console.log(isAdmin)
     } catch (err) {
       console.log("getAdminAddr error...");
       console.log(err);
@@ -84,7 +91,10 @@ function App() {
           let thisQuestId = thisQuest[0];
 
           thisQuestStatus.push(thisQuestTitle);
-          const questStatusId = await stackupContract.playerQuestStatuses(currentAccount, thisQuestId);
+          const questStatusId = await stackupContract.playerQuestStatuses(
+            currentAccount,
+            thisQuestId
+          );
           thisQuestStatus.push(questStatusMapping[questStatusId]);
 
           userQuestStatuses.push(thisQuestStatus);
@@ -126,10 +136,38 @@ function App() {
         await tx.wait();
       }
     } catch (err) {
-      console.log(err)
+      console.log(err);
       alert("error encountered! refer to console log to debug");
     }
-  }
+  };
+
+  const createQuestHandler = async () => {
+    try {
+      if (!questTitle || questReward === 0 || numberOfRewards === 0) {
+        alert("Please enter all quest details");
+        return;
+      }
+
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = provider.getSigner();
+      const stackupContract = new ethers.Contract(contractAddr, abi, signer);
+      const tx = await stackupContract.createQuest(questTitle, questReward, numberOfRewards);
+      await tx.wait();
+
+      console.log(numberOfRewards);
+
+      // Clear the input fields after successful quest creation
+      setQuestTitle("");
+      setQuestReward(0);
+      setNumberOfRewards(0);
+
+      // Refresh quests information
+      getQuestsInfo();
+    } catch (err) {
+      console.log(err);
+      alert("Error creating quest. Please check the console log for more details.");
+    }
+  };
 
   useEffect(() => {
     getAdminAddr();
@@ -141,8 +179,54 @@ function App() {
     <div className="container">
       <h1>Build Your First Dapp</h1>
       <h4>By: Djorro</h4>
-      {currentAccount ? <h4>Wallet connected: {currentAccount}</h4> : <button onClick={connectWalletHandler}>Connect Wallet</button>}
+      {currentAccount ? (
+        <h4>Wallet connected: {currentAccount}</h4>
+      ) : (
+        <button onClick={connectWalletHandler}>Connect Wallet</button>
+      )}
       <h4>Admin address: {adminAddr}</h4>
+      {isAdmin && (
+        <>
+          <h4>Admin address: {adminAddr}</h4>
+          <h2>
+            <u>Actions for Admin:</u>
+          </h2>
+          <h2>
+            <u>Create Quest:</u>
+          </h2>
+          <div className="form">
+            <div className="form-item">
+              <label>Title: </label>
+              <input
+                type="text"
+                placeholder="Quest Title"
+                value={questTitle}
+                onChange={(e) => setQuestTitle(e.target.value)}
+              />
+            </div>
+            <div className="form-item">
+              <label>Reward: </label>
+              <input
+                type="number"
+                placeholder="Reward"
+                value={questReward}
+                onChange={(e) => setQuestReward(parseInt(e.target.value))}
+              />
+            </div>
+            <div className="form-item">
+              <label>Number of Rewards: </label>
+              <input
+                type="number"
+                placeholder="Number of Rewards"
+                value={numberOfRewards}
+                onChange={(e) => setNumberOfRewards(parseInt(e.target.value))}
+              />
+            </div>
+            <button onClick={createQuestHandler}>Create Quest</button>
+          </div>
+        </>
+      )}
+
       <h2>
         <u>All Quests:</u>
       </h2>
@@ -184,7 +268,12 @@ function App() {
         <u>Actions:</u>
       </h2>
       <div>
-        <input type="text" placeholder="Quest Id" value={questId} onChange={(e) => setQuestId(e.target.value)} />
+        <input
+          type="text"
+          placeholder="Quest Id"
+          value={questId}
+          onChange={(e) => setQuestId(e.target.value)}
+        />
         <button onClick={joinQuestHandler}>Join Quest</button>
         <button onClick={submitQuestHandler}>Submit Quest</button>
       </div>

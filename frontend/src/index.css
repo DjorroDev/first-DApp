@@ -9,3 +9,14 @@
 body {
   background-color: #F7EDE2;
 }
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.form-item {
+  display: flex;
+  justify-content: space-between;
+}
