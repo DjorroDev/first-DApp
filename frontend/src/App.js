@@ -17,6 +17,16 @@ function App() {
   const [questReward, setQuestReward] = useState(0);
   const [numberOfRewards, setNumberOfRewards] = useState(0);
 
+  const [submissions, setSubmissions] = useState([]);
+  const [submission, setSubmission] = useState("");
+
+  const [status, setStatus] = useState(0);
+  const [playerAddr, setPlayerAddr] = useState("");
+
+  const onOptionChange = (e) => {
+    setStatus(e.target.value);
+  };
+
   const connectWalletHandler = async () => {
     if (typeof window !== "undefined" && typeof window.ethereum !== "undefined") {
       try {
@@ -68,6 +78,26 @@ function App() {
     }
   };
 
+  const getQuestSubmissions = async (questId) => {
+    try {
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const stackupContract = new ethers.Contract(contractAddr, abi, provider);
+
+      const filter = stackupContract.filters.QuestSubmission(questId);
+      const logs = await stackupContract.queryFilter(filter);
+
+      const newSubmissions = logs.map((log) => ({
+        player: log.args.player,
+        submission: log.args.submission,
+      }));
+
+      setSubmissions(newSubmissions);
+    } catch (err) {
+      console.log("getQuestSubmissions error...");
+      console.log(err);
+    }
+  };
+
   const getUserQuestStatuses = async () => {
     try {
       if (currentAccount) {
@@ -79,6 +109,9 @@ function App() {
           0: "Not Joined",
           1: "Joined",
           2: "Submitted",
+          3: "Rejected",
+          4: "Approved",
+          5: "Rewarded",
         };
         let userQuestStatuses = [];
         let thisQuest;
@@ -132,7 +165,9 @@ function App() {
         const provider = new ethers.providers.Web3Provider(window.ethereum);
         const signer = provider.getSigner();
         const stackupContract = new ethers.Contract(contractAddr, abi, signer);
-        const tx = await stackupContract.submitQuest(questId);
+        console.log(submission, questId);
+        const tx = await stackupContract.submitQuest(questId, submission);
+        console.log(submission, questId);
         await tx.wait();
       }
     } catch (err) {
@@ -169,10 +204,36 @@ function App() {
     }
   };
 
+  const reviewQuestHandler = async () => {
+    try {
+      if (!playerAddr || status === 0) {
+        alert("Please select a player address and set a status.");
+        return;
+      }
+
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = provider.getSigner();
+      const stackupContract = new ethers.Contract(contractAddr, abi, signer);
+
+      // Call the reviewQuest function from the smart contract
+      const tx = await stackupContract.reviewQuest(questId, status, playerAddr);
+      await tx.wait();
+
+      // Perform any additional logic or UI updates after reviewing the quest.
+      // For example, you can fetch the updated quest details or refresh the list.
+    } catch (err) {
+      console.log(err);
+      alert("Error encountered! Refer to the console log to debug.");
+    }
+  };
+
   useEffect(() => {
     getAdminAddr();
     getQuestsInfo();
     getUserQuestStatuses();
+    if (questId !== "" && isAdmin) {
+      getQuestSubmissions(questId);
+    }
   });
 
   return (
@@ -247,23 +308,28 @@ function App() {
             );
           })}
       </div>
-      <h2>
-        <u>Your Quest Statuses:</u>
-      </h2>
-      <div>
-        <ul>
-          {userQuestStatuses &&
-            userQuestStatuses.map((quest) => {
-              return (
-                <div key={quest[0]}>
-                  <li>
-                    {quest[0]} - {quest[1]}
-                  </li>
-                </div>
-              );
-            })}
-        </ul>
-      </div>
+      {!isAdmin && (
+        <>
+          <h2>
+            <u>Your Quest Statuses:</u>
+          </h2>
+          <div>
+            <ul>
+              {userQuestStatuses &&
+                userQuestStatuses.map((quest) => {
+                  return (
+                    <div key={quest[0]}>
+                      <li>
+                        {quest[0]} - {quest[1]}
+                      </li>
+                    </div>
+                  );
+                })}
+            </ul>
+          </div>
+        </>
+      )}
+
       <h2>
         <u>Actions:</u>
       </h2>
@@ -274,9 +340,108 @@ function App() {
           value={questId}
           onChange={(e) => setQuestId(e.target.value)}
         />
-        <button onClick={joinQuestHandler}>Join Quest</button>
-        <button onClick={submitQuestHandler}>Submit Quest</button>
+        {!isAdmin && (
+          <>
+            <input
+              type="text"
+              placeholder="Your Submission"
+              value={submission}
+              onChange={(e) => setSubmission(e.target.value)}
+            />
+          </>
+        )}
+        {!isAdmin && (
+          <>
+            <button onClick={joinQuestHandler}>Join Quest</button>
+            <button onClick={submitQuestHandler}>Submit Quest</button>
+          </>
+        )}
       </div>
+
+      {isAdmin && (
+        <>
+          <h2>
+            <u>Quest Submissions:</u>
+          </h2>
+          <h3>
+            <u>Quest Id {questId}</u>
+          </h3>
+          <div>
+            <p>Please input quest ID in action section to show Submission:</p>
+            <ol>
+              {submissions.map((submission, index) => (
+                <li key={index}>
+                  <div>Player: {submission.player}</div>
+                  <div>Submission: {submission.submission}</div>
+                </li>
+              ))}
+            </ol>
+          </div>
+          <h2>
+            <u>Review Submissions & Quest:</u>
+          </h2>
+          <div>
+            <div className="form">
+              <div className="form-item">
+                <label>Quest ID: </label>
+                <input
+                  type="number"
+                  placeholder="Quest Id"
+                  value={questId}
+                  onChange={(e) => setQuestId(e.target.value)}
+                />
+              </div>
+              <div className="form-item">
+                <label>Player Address: </label>
+                <input
+                  type="string"
+                  placeholder="0xf39Fd6e51aa"
+                  value={playerAddr}
+                  onChange={(e) => setPlayerAddr(e.target.value)}
+                />
+              </div>
+              <div className="form-item-radio">
+                <label>Status: </label>
+                <label>
+                  <input
+                    type="radio"
+                    name="status"
+                    id="status"
+                    value="3"
+                    checked={status === "3"}
+                    onChange={onOptionChange}
+                  />
+                  Rejected
+                </label>
+                <label>
+                  <input
+                    type="radio"
+                    name="status"
+                    id="status"
+                    value="4"
+                    checked={status === "4"}
+                    onChange={onOptionChange}
+                  />
+                  Approved
+                </label>
+                <label>
+                  <input
+                    type="radio"
+                    name="status"
+                    id="status"
+                    value="5"
+                    checked={status === "5"}
+                    onChange={onOptionChange}
+                  />
+                  Rewarded
+                </label>
+              </div>
+              <button onClick={reviewQuestHandler}>Submit Review</button>
+            </div>
+          </div>
+        </>
+      )}
+      <footer></footer>
     </div>
   );
 }

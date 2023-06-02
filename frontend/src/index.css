@@ -20,3 +20,13 @@ body {
   display: flex;
   justify-content: space-between;
 }
+
+.form-item-radio {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+footer {
+  margin-top: 300px;
+}
