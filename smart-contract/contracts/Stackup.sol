@@ -95,6 +95,25 @@ contract StackUp {
         playerQuestStatuses[playerAddr][questId] = PlayerQuestStatus(status);
     }
 
+    function updateQuest(
+        uint256 questId,
+        string calldata newTitle,
+        uint8 newReward,
+        uint256 newNumberOfRewards
+    ) external onlyAdmin questExists(questId) {
+        // Perform necessary validations and checks, then update the quest
+        quests[questId].title = newTitle;
+        quests[questId].reward = newReward;
+        quests[questId].numberOfRewards = newNumberOfRewards;
+    }
+
+    function deleteQuest(
+        uint256 questId
+    ) external onlyAdmin questExists(questId) {
+        // Perform necessary validations and checks, then delete the quest
+        delete quests[questId];
+    }
+
     modifier questExists(uint256 questId) {
         require(quests[questId].reward != 0, "Quest does not exist");
         _;
